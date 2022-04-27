@@ -21,6 +21,7 @@ library(mvtnorm)
 library(ggpubr)
 library(knitr)
 library(ggridges)
+library(boot)
 ```
 
 
@@ -105,6 +106,7 @@ ggarrange(
 
 
 ```{r}
+set.seed(2) 
 
 data <- rep(
   crossing(
@@ -113,10 +115,13 @@ data <- rep(
     participant = paste0('P', seq(1, 30, by = 1))
   )) %>% 
   group_by(participant) %>%
-  mutate(answer = rnorm(4, c(5, 3, 5, 6), c(.75, .6, .56, .61))) %>%
+  mutate(answer = rnorm(4, c(5, 3.75, 5, 5.5), c(2.1, 1.5, 2.4, 2.1))) %>%
   arrange(participant)
 
 kable(data)
+
+min(data$answer)
+max(data$answer)
 ```
 
 
@@ -142,27 +147,44 @@ data %>%
   xlab('')
 
 ```
+
+
 ```{r}
 
-data %>% 
+data_ci <- data %>% 
   group_by(mark, color) %>%
-  # This is not the correct way to calculate confidence interval
-  # Don't use this
-  # This is quantile interval
-  mean_qi(answer) %>%
+  nest() %>% 
+  mutate(boot_res = map(data,
+                        ~ boot(data = .$answer,
+                               statistic = function(x, i) mean(x[i]),
+                               R = 1000)),
+         boot_res_ci = map(boot_res, boot.ci, type = "perc"),
+         answer = map(boot_res_ci, ~ .$t0),
+         .lower = map(boot_res_ci, ~ .$percent[[4]]),
+         .upper = map(boot_res_ci, ~ .$percent[[5]]),
+         n =  map(data, nrow)) %>% 
+  #select(-data, -boot_res, -boot_res_ci) %>% 
+  unnest(cols = c(n, answer, .lower, .upper)) %>% 
+  ungroup()
+
+```
+
+
+```{r}
+
+data_ci %>%
   ggplot(., aes(x = interaction(mark, color))) +
-  geom_bar(aes(y = answer), stat = 'identity', fill = 'gray60', width = .25) + 
-  geom_errorbar(aes(ymin = .lower, ymax = .upper), width = 0.1, size = .75) +
+  geom_bar(aes(y = answer), stat = 'identity', width = .5, fill = 'gray') + 
+  geom_errorbar(aes(ymin = .lower, ymax = .upper), width = .1, size = .75) +
   scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
   xlab('')
 
 ```
 
+
 ```{r}
 
-data %>% 
-  group_by(mark, color) %>%
-  mean_qi(answer) %>%
+data_ci %>%
   ggplot(., aes(x = interaction(mark, color))) +
   geom_point(aes(y = answer)) + 
   geom_errorbar(aes(ymin = .lower, ymax = .upper), width = 0, size = .75) +
@@ -172,10 +194,7 @@ data %>%
 ```
 
 ```{r}
-
-data %>% 
-  group_by(mark, color) %>%
-  mean_qi(answer) %>%
+data_ci %>%
   ggplot(., aes(x = interaction(mark, color))) +
   geom_point(aes(y = answer, color = color)) + 
   geom_errorbar(aes(ymin = .lower, ymax = .upper, color = color), width = 0, size = .75) +
@@ -188,9 +207,7 @@ data %>%
 
 ```{r}
 
-data %>% 
-  group_by(mark, color) %>%
-  mean_qi(answer) %>%
+data_ci %>%
   ggplot(., aes(x = interaction(mark, color))) +
   geom_point(aes(y = answer, color = color)) + 
   geom_errorbar(aes(ymin = .lower, ymax = .upper, color = color), width = 0, size = .75) +
@@ -205,9 +222,7 @@ data %>%
 
 ```{r}
 
-data %>% 
-  group_by(mark, color) %>%
-  mean_qi(answer) %>%
+data_ci %>%
   ggplot(., aes(x = interaction(mark, color))) +
   geom_point(aes(y = answer, color = color, shape = mark), size = 2) + 
   geom_errorbar(aes(ymin = .lower, ymax = .upper, color = color), width = 0, size = .75) +
@@ -219,10 +234,7 @@ data %>%
 
 
 ```{r}
-
-data %>% 
-  group_by(mark, color) %>%
-  mean_qi(answer) %>%
+data_ci %>%
   ggplot(., aes(x = interaction(mark, color))) +
   geom_point(aes(y = answer, color = color, shape = mark), size = 2) + 
   geom_errorbar(aes(ymin = .lower, ymax = .upper, color = color), width = 0, size = .75) +
@@ -245,10 +257,7 @@ PostHocTest(aov(answer ~ color*mark, data = data), method = "bonferroni")
 
 
 ```{r fig.height=2, fig.width=7, warning=FALSE}
-
-data %>% 
-  group_by(mark, color) %>%
-  mean_qi(answer) %>%
+data_ci %>%
   ggplot(., aes(y = interaction(mark, color))) +
   geom_point(aes(x = answer, color = color, shape = mark), size = 2) + 
   geom_errorbarh(aes(xmin = .lower, xmax = .upper, color = color), height = 0, size = .75) +
@@ -260,9 +269,7 @@ data %>%
 
 ```{r fig.height=2, fig.width=7, warning=FALSE}
 
-data %>% 
-  group_by(mark, color) %>%
-  mean_qi(answer) %>%
+data_ci %>%
   ggplot(., aes(y = interaction(mark, color))) +
   geom_point(data, mapping = aes(x = answer, color = color), shape = '|', size = 2, position = position_nudge(y = .2), alpha = .5) + 
   geom_point(aes(x = answer, color = color, shape = mark), size = 2) + 
@@ -273,6 +280,18 @@ data %>%
   ylab('')
 ```
 
+```{r fig.height=2, fig.width=7, warning=FALSE}
+
+data_ci %>%
+  ggplot(., aes(y = interaction(mark, color))) +
+  geom_errorbarh(aes(xmin = .lower, xmax = .upper, color = color), height = 0, size = 3, alpha = .85) +
+  geom_point(aes(x = answer, shape = mark), size = 2, color = 'white') + 
+  scale_x_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  scale_color_manual(values = c('skyblue2', 'goldenrod1')) + 
+  geom_vline(xintercept = 3.5, linetype = 'dashed', color = 'gray') + 
+  ylab('')
+```
+
 
 
 ```{r fig.height=2, fig.width=7, warning=FALSE}
@@ -281,10 +300,10 @@ data %>%
   group_by(mark, color) %>%
   mean_qi(answer) %>%
   ggplot(., aes(y = interaction(mark, color))) +
-  geom_density_ridges(data, mapping = aes(x = answer, fill = color, color = NA), size = 0, position = position_nudge(y = .2), alpha = .5, bandwidth = .5) + 
+  geom_density_ridges(data, mapping = aes(x = answer, fill = color, color = NA), size = 0, position = position_nudge(y = .2), alpha = .5, bandwidth = 1) + 
   geom_point(aes(x = answer, color = color, shape = mark), size = 2) + 
   geom_errorbarh(aes(xmin = .lower, xmax = .upper, color = color), height = 0, size = .75) +
-  scale_x_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  scale_x_continuous(limits = c(-5, 15), breaks = seq(0, 10, by = 2)) +
   scale_fill_manual(values = c('skyblue2', 'goldenrod1')) + 
   scale_color_manual(values = c('skyblue2', 'goldenrod1')) + 
   geom_vline(xintercept = 3.5, linetype = 'dashed', color = 'gray') + 
