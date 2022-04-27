@@ -1,0 +1,292 @@
+---
+title: "Empricial Study"
+output: 
+  html_document: 
+    highlight: pygments
+date: '2022-04-21'
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.width = 7, fig.height = 4)
+```
+
+```{r warning=FALSE, message=FALSE}
+
+library(tidyverse)
+library(mefa)
+library(ggdist)
+library(nlme)
+library(multcomp)
+library(DescTools)
+library(mvtnorm)
+library(ggpubr)
+library(knitr)
+library(ggridges)
+```
+
+
+```{r}
+
+
+theme_set(theme_ggdist() + theme(
+  strip.background = element_blank(),
+  plot.title = element_text(hjust = .5),
+  axis.text.x = element_text(angle = 0, hjust = .5)
+))
+
+ggplot <-
+  function(...)
+    ggplot2::ggplot(...) +
+  scale_color_brewer(palette = 'Set2') +
+  scale_fill_brewer(palette = 'Set2')
+
+```
+
+
+
+```{r fig.height=3.5, fig.width=14}
+
+stimuli <-
+  rmvnorm(50, mean = c(.5, .3), sigma = matrix(c(4, 1, 1, 3), ncol = 2))
+
+ggarrange(
+  as_tibble(stimuli) %>%
+    ggplot(., aes(x = V1, y = V2)) +
+    geom_point(
+      color = 'skyblue2',
+      shape = 16,
+      size = 2
+    ) +
+    xlab('') + ylab('') + theme(
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks = element_blank()
+    ),
+  as_tibble(stimuli) %>%
+    ggplot(., aes(x = V1, y = V2)) +
+    geom_point(
+      color = 'goldenrod1',
+      shape = 16,
+      size = 2
+    ) +
+    xlab('') + ylab('') + theme(
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks = element_blank()
+    ),
+  as_tibble(stimuli) %>%
+    ggplot(., aes(x = V1, y = V2)) +
+    geom_point(
+      color = 'skyblue2',
+      shape = 17,
+      size = 2
+    ) +
+        xlab('') + ylab('') + theme(
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks = element_blank()
+    ),
+  as_tibble(stimuli) %>%
+    ggplot(., aes(x = V1, y = V2)) +
+    geom_point(
+      color = 'goldenrod1',
+      shape = 17,
+      size = 2
+    ) +
+     xlab('') + ylab('') + theme(
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks = element_blank()
+    ),
+  ncol = 4
+)
+
+```
+
+
+
+```{r}
+
+data <- rep(
+  crossing(
+    color = c('blue', 'yellow'),
+    mark = c('triangle', 'circle'),
+    participant = paste0('P', seq(1, 30, by = 1))
+  )) %>% 
+  group_by(participant) %>%
+  mutate(answer = rnorm(4, c(5, 3, 5, 6), c(.75, .6, .56, .61))) %>%
+  arrange(participant)
+
+kable(data)
+```
+
+
+
+```{r}
+
+data %>% 
+  ggplot(., aes(x = interaction(mark, color), y = answer)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  xlab('')
+
+```
+
+
+```{r}
+
+data %>% 
+  ggplot(., aes(x = interaction(mark, color), y = answer)) +
+  geom_point(color = 'gray30', alpha = .2) +
+ # facet_grid(color ~ mark) + 
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  xlab('')
+
+```
+```{r}
+
+data %>% 
+  group_by(mark, color) %>%
+  # This is not the correct way to calculate confidence interval
+  # Don't use this
+  # This is quantile interval
+  mean_qi(answer) %>%
+  ggplot(., aes(x = interaction(mark, color))) +
+  geom_bar(aes(y = answer), stat = 'identity', fill = 'gray60', width = .25) + 
+  geom_errorbar(aes(ymin = .lower, ymax = .upper), width = 0.1, size = .75) +
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  xlab('')
+
+```
+
+```{r}
+
+data %>% 
+  group_by(mark, color) %>%
+  mean_qi(answer) %>%
+  ggplot(., aes(x = interaction(mark, color))) +
+  geom_point(aes(y = answer)) + 
+  geom_errorbar(aes(ymin = .lower, ymax = .upper), width = 0, size = .75) +
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  xlab('')
+
+```
+
+```{r}
+
+data %>% 
+  group_by(mark, color) %>%
+  mean_qi(answer) %>%
+  ggplot(., aes(x = interaction(mark, color))) +
+  geom_point(aes(y = answer, color = color)) + 
+  geom_errorbar(aes(ymin = .lower, ymax = .upper, color = color), width = 0, size = .75) +
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  xlab('')
+
+```
+
+
+
+```{r}
+
+data %>% 
+  group_by(mark, color) %>%
+  mean_qi(answer) %>%
+  ggplot(., aes(x = interaction(mark, color))) +
+  geom_point(aes(y = answer, color = color)) + 
+  geom_errorbar(aes(ymin = .lower, ymax = .upper, color = color), width = 0, size = .75) +
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  scale_color_manual(values = c('skyblue2', 'goldenrod1')) + 
+  xlab('')
+
+
+```
+
+
+
+```{r}
+
+data %>% 
+  group_by(mark, color) %>%
+  mean_qi(answer) %>%
+  ggplot(., aes(x = interaction(mark, color))) +
+  geom_point(aes(y = answer, color = color, shape = mark), size = 2) + 
+  geom_errorbar(aes(ymin = .lower, ymax = .upper, color = color), width = 0, size = .75) +
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  scale_color_manual(values = c('skyblue2', 'goldenrod1')) + 
+  xlab('')
+```
+
+
+
+```{r}
+
+data %>% 
+  group_by(mark, color) %>%
+  mean_qi(answer) %>%
+  ggplot(., aes(x = interaction(mark, color))) +
+  geom_point(aes(y = answer, color = color, shape = mark), size = 2) + 
+  geom_errorbar(aes(ymin = .lower, ymax = .upper, color = color), width = 0, size = .75) +
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  scale_color_manual(values = c('skyblue2', 'goldenrod1')) + 
+  geom_hline(yintercept = 3.5, linetype = 'dashed', color = 'gray') + 
+  xlab('')
+```
+
+
+```{r}
+
+model <- lme(answer ~ color + mark, data=data, random = ~1|participant)
+kable(anova(model))
+
+PostHocTest(aov(answer ~ color*mark, data = data), method = "bonferroni")
+```
+
+
+
+
+```{r fig.height=2, fig.width=7, warning=FALSE}
+
+data %>% 
+  group_by(mark, color) %>%
+  mean_qi(answer) %>%
+  ggplot(., aes(y = interaction(mark, color))) +
+  geom_point(aes(x = answer, color = color, shape = mark), size = 2) + 
+  geom_errorbarh(aes(xmin = .lower, xmax = .upper, color = color), height = 0, size = .75) +
+  scale_x_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  scale_color_manual(values = c('skyblue2', 'goldenrod1')) + 
+  geom_vline(xintercept = 3.5, linetype = 'dashed', color = 'gray') + 
+  ylab('')
+```
+
+```{r fig.height=2, fig.width=7, warning=FALSE}
+
+data %>% 
+  group_by(mark, color) %>%
+  mean_qi(answer) %>%
+  ggplot(., aes(y = interaction(mark, color))) +
+  geom_point(data, mapping = aes(x = answer, color = color), shape = '|', size = 2, position = position_nudge(y = .2), alpha = .5) + 
+  geom_point(aes(x = answer, color = color, shape = mark), size = 2) + 
+  geom_errorbarh(aes(xmin = .lower, xmax = .upper, color = color), height = 0, size = .75) +
+  scale_x_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  scale_color_manual(values = c('skyblue2', 'goldenrod1')) + 
+  geom_vline(xintercept = 3.5, linetype = 'dashed', color = 'gray') + 
+  ylab('')
+```
+
+
+
+```{r fig.height=2, fig.width=7, warning=FALSE}
+
+data %>% 
+  group_by(mark, color) %>%
+  mean_qi(answer) %>%
+  ggplot(., aes(y = interaction(mark, color))) +
+  geom_density_ridges(data, mapping = aes(x = answer, fill = color, color = NA), size = 0, position = position_nudge(y = .2), alpha = .5, bandwidth = .5) + 
+  geom_point(aes(x = answer, color = color, shape = mark), size = 2) + 
+  geom_errorbarh(aes(xmin = .lower, xmax = .upper, color = color), height = 0, size = .75) +
+  scale_x_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2)) +
+  scale_fill_manual(values = c('skyblue2', 'goldenrod1')) + 
+  scale_color_manual(values = c('skyblue2', 'goldenrod1')) + 
+  geom_vline(xintercept = 3.5, linetype = 'dashed', color = 'gray') + 
+  ylab('')
+```
